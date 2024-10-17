@@ -1,0 +1,94 @@
+import numpy as np
+import os
+import cv2
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+data_dir = 'path/to/hand_gesture_dataset'
+categories = os.listdir(data_dir)
+images = []
+labels = []
+
+for category in categories:
+    path = os.path.join(data_dir, category)
+    label = categories.index(category)
+    
+    for img_name in os.listdir(path):
+        img_path = os.path.join(path, img_name)
+        img = cv2.imread(img_path)
+        img = cv2.resize(img, (64, 64))  # Resize to 64x64
+        images.append(img)
+        labels.append(label)
+
+# Convert to numpy arrays
+images = np.array(images)
+labels = np.array(labels)
+X = images / 255.0  # Normalize pixel values to [0, 1]
+y = labels
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+datagen = ImageDataGenerator(
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+datagen.fit(X_train)
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)),
+    MaxPooling2D(pool_size=(2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D(pool_size=(2, 2)),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(len(categories), activation='softmax')  # Output layer
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+history = model.fit(datagen.flow(X_train, y_train, batch_size=32),
+                    epochs=25,
+                    validation_data=(X_test, y_test))
+loss, accuracy = model.evaluate(X_test, y_test)
+print(f'Test Accuracy: {accuracy * 100:.2f}%')
+
+# Optional: Plot training history
+plt.plot(history.history['accuracy'], label='train accuracy')
+plt.plot(history.history['val_accuracy'], label='val accuracy')
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+cap = cv2.VideoCapture(0)  # Capture from webcam
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Preprocess the frame
+    img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (64, 64)) / 255.0
+    img = np.expand_dims(img, axis=0)
+
+    # Make predictions
+    predictions = model.predict(img)
+    gesture = categories[np.argmax(predictions)]
+
+    # Display the result
+    cv2.putText(frame, gesture, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+    cv2.imshow('Gesture Recognition', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
