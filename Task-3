@@ -1,0 +1,69 @@
+# Step 1: Import Libraries
+import numpy as np
+import pandas as pd
+import os
+import cv2
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Step 2: Load the Dataset
+# Assuming you have the dataset in a directory structure like:
+# /input/dogs-vs-cats/train/cat.0.jpg
+# /input/dogs-vs-cats/train/dog.0.jpg
+
+data_dir = 'path/to/dogs-vs-cats/train'
+categories = ['cat', 'dog']
+images = []
+labels = []
+
+# Load images and labels
+for category in categories:
+    path = os.path.join(data_dir, category)
+    label = categories.index(category)
+    
+    for img_name in os.listdir(path):
+        img_path = os.path.join(path, img_name)
+        img = cv2.imread(img_path)
+        img = cv2.resize(img, (64, 64))  # Resize to 64x64
+        images.append(img)
+        labels.append(label)
+
+# Convert to numpy arrays
+images = np.array(images)
+labels = np.array(labels)
+
+# Step 3: Data Augmentation (optional)
+# If needed, you can implement data augmentation here using Keras or OpenCV.
+
+# Step 4: Flatten the images for SVM input
+n_samples, h, w, c = images.shape
+X = images.reshape(n_samples, -1)  # Flatten each image
+y = labels
+
+# Step 5: Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 6: Model Implementation
+# Create and train the SVM model
+model = SVC(kernel='linear', random_state=42)
+model.fit(X_train, y_train)
+
+# Step 7: Predictions
+y_pred = model.predict(X_test)
+
+# Step 8: Evaluation
+print(classification_report(y_test, y_pred, target_names=categories))
+conf_matrix = confusion_matrix(y_test, y_pred)
+print('Confusion Matrix:\n', conf_matrix)
+
+# Optional: Visualize some predictions
+plt.figure(figsize=(12, 8))
+for i in range(15):
+    plt.subplot(3, 5, i + 1)
+    plt.imshow(X_test[i].reshape(64, 64, 3))  # Reshape back to image dimensions
+    plt.title(f'Predicted: {categories[y_pred[i]]}, Actual: {categories[y_test[i]]}')
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
